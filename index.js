@@ -1,12 +1,10 @@
 import pkg from '@whiskeysockets/baileys';
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    DisconnectReason, 
-    fetchLatestBaileysVersion, 
-    makeInMemoryStore, 
-    jidDecode 
-} = pkg;
+// هذه الطريقة تضمن الوصول للوظائف حتى لو اختلفت نسخة المكتبة
+const makeWASocket = pkg.default || pkg;
+const useMultiFileAuthState = pkg.useMultiFileAuthState || pkg.default?.useMultiFileAuthState;
+const makeInMemoryStore = pkg.makeInMemoryStore || pkg.default?.makeInMemoryStore;
+const fetchLatestBaileysVersion = pkg.fetchLatestBaileysVersion || pkg.default?.fetchLatestBaileysVersion;
+const DisconnectReason = pkg.DisconnectReason || pkg.default?.DisconnectReason;
 
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
@@ -14,14 +12,13 @@ import qrcode from 'qrcode-terminal';
 import { config } from './src/config/config.js';
 import { handleMessage } from './src/handlers/messageHandler.js';
 
-// إنشاء المخزن (Store) بشكل صحيح
 const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) });
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState(config.sessionName);
     const { version, isLatest } = await fetchLatestBaileysVersion();
 
-    console.log(`Starting Bot using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
+    console.log(`Starting Bot using WhatsApp Web v${version.join('.')}`);
 
     const sock = makeWASocket({
         version,
@@ -38,7 +35,6 @@ async function startBot() {
         }
     });
 
-    // كود الربط (Pairing Code)
     if (!sock.authState.creds.registered) {
         const phoneNumber = config.ownerNumber;
         if (phoneNumber && phoneNumber !== '249xxxxxxxxx') {
@@ -47,9 +43,9 @@ async function startBot() {
                     let code = await sock.requestPairingCode(phoneNumber);
                     console.log(`\n\n==== PAIRING CODE ==== \nYour code is: ${code}\n======================\n\n`);
                 } catch (e) {
-                    console.error("Failed to request pairing code", e);
+                    console.error("Pairing code error:", e);
                 }
-            }, 3000);
+            }, 6000);
         }
     }
 
@@ -57,17 +53,11 @@ async function startBot() {
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
-        
-        if(qr) {
-            console.log('Scan the QR code below or check pairing code in logs:');
-            qrcode.generate(qr, { small: true });
-        }
+        if(qr) qrcode.generate(qr, { small: true });
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) {
-                startBot();
-            }
+            if (shouldReconnect) startBot();
         } else if (connection === 'open') {
             console.log('Bot successfully connected to WhatsApp!');
         }
@@ -86,4 +76,5 @@ async function startBot() {
     return sock;
 }
 
-startBot().catch(err => console.error("Error starting bot:", err));
+startBot().catch(err => console.error(err));
+
