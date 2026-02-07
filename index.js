@@ -1,20 +1,20 @@
 import pkg from '@whiskeysockets/baileys';
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeInMemoryStore,
-    jidDecode
+const { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestBaileysVersion, 
+    makeInMemoryStore, 
+    jidDecode 
 } = pkg;
 
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
-import fs from 'fs';
 import qrcode from 'qrcode-terminal';
 import { config } from './src/config/config.js';
 import { handleMessage } from './src/handlers/messageHandler.js';
 
+// إنشاء المخزن (Store) بشكل صحيح
 const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) });
 
 async function startBot() {
@@ -38,13 +38,17 @@ async function startBot() {
         }
     });
 
-    // Pairing Code logic
+    // كود الربط (Pairing Code)
     if (!sock.authState.creds.registered) {
         const phoneNumber = config.ownerNumber;
         if (phoneNumber && phoneNumber !== '249xxxxxxxxx') {
             setTimeout(async () => {
-                let code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n\n==== PAIRING CODE ==== \nYour code is: ${code}\n======================\n\n`);
+                try {
+                    let code = await sock.requestPairingCode(phoneNumber);
+                    console.log(`\n\n==== PAIRING CODE ==== \nYour code is: ${code}\n======================\n\n`);
+                } catch (e) {
+                    console.error("Failed to request pairing code", e);
+                }
             }, 3000);
         }
     }
@@ -53,9 +57,9 @@ async function startBot() {
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-            console.log('Scan the QR code below to connect:');
+        
+        if(qr) {
+            console.log('Scan the QR code below or check pairing code in logs:');
             qrcode.generate(qr, { small: true });
         }
 
