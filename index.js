@@ -1,12 +1,13 @@
-import {
-    makeWASocket,
+import pkg from '@whiskeysockets/baileys';
+const {
+    default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
     makeInMemoryStore,
-    jidDecode,
-    getAggregateVotesInPollMessage
-} from '@whiskeysockets/baileys';
+    jidDecode
+} = pkg;
+
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
 import fs from 'fs';
@@ -37,9 +38,9 @@ async function startBot() {
         }
     });
 
-    // Pairing Code logic for environments without terminal QR access
+    // Pairing Code logic
     if (!sock.authState.creds.registered) {
-        const phoneNumber = config.ownerNumber; // Usage: Ensure this is set in config
+        const phoneNumber = config.ownerNumber;
         if (phoneNumber && phoneNumber !== '249xxxxxxxxx') {
             setTimeout(async () => {
                 let code = await sock.requestPairingCode(phoneNumber);
@@ -60,7 +61,6 @@ async function startBot() {
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
             if (shouldReconnect) {
                 startBot();
             }
@@ -76,25 +76,6 @@ async function startBot() {
         for (const msg of m.messages) {
             if (!msg.message) continue;
             await handleMessage(sock, msg);
-        }
-    });
-
-    sock.ev.on('group-participants.update', async (anu) => {
-        console.log(anu);
-        try {
-            let metadata = await sock.groupMetadata(anu.id);
-            let participants = anu.participants;
-            for (let num of participants) {
-                if (anu.action == 'add') {
-                    const welcomeMsg = `أهلاً بك يا @${num.split("@")[0]} في مجموعة ${metadata.subject}! 🎉\n\nاستخدم !help لرؤية الأوامر.`;
-                    await sock.sendMessage(anu.id, {
-                        text: welcomeMsg,
-                        mentions: [num]
-                    });
-                }
-            }
-        } catch (err) {
-            console.log(err);
         }
     });
 
